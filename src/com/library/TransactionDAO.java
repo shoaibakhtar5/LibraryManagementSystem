@@ -9,8 +9,10 @@ import java.util.Date;
 import java.util.List;
 
 public class TransactionDAO {
-    public void issueBook(int bookId, int memberId, int staffId) throws SQLException {
-        // Check book availability
+    public void issueBook(User user, int bookId, int memberId, int staffId) throws SQLException {
+        if (!user.hasRole("Admin") && !user.hasRole("Staff")) {
+            throw new SecurityException("Only Admin or Staff can issue books");
+        }
         String checkQuery = "SELECT available_copies FROM Books WHERE book_id = ?";
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement checkStmt = conn.prepareStatement(checkQuery)) {
@@ -21,7 +23,6 @@ public class TransactionDAO {
             }
         }
 
-        // Insert transaction
         String insertQuery = "INSERT INTO Transactions (book_id, member_id, staff_id, issue_date, due_date) VALUES (?, ?, ?, CURDATE(), DATE_ADD(CURDATE(), INTERVAL 14 DAY))";
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement insertStmt = conn.prepareStatement(insertQuery)) {
@@ -31,7 +32,6 @@ public class TransactionDAO {
             insertStmt.executeUpdate();
         }
 
-        // Update book availability
         String updateQuery = "UPDATE Books SET available_copies = available_copies - 1 WHERE book_id = ?";
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement updateStmt = conn.prepareStatement(updateQuery)) {
@@ -40,8 +40,10 @@ public class TransactionDAO {
         }
     }
 
-    public void returnBook(int transactionId) throws SQLException {
-        // Check if already returned
+    public void returnBook(User user, int transactionId) throws SQLException {
+        if (!user.hasRole("Admin") && !user.hasRole("Staff")) {
+            throw new SecurityException("Only Admin or Staff can return books");
+        }
         String checkQuery = "SELECT return_date FROM Transactions WHERE transaction_id = ?";
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement checkStmt = conn.prepareStatement(checkQuery)) {
@@ -52,7 +54,6 @@ public class TransactionDAO {
             }
         }
 
-        // Update transaction (trigger calculates fine)
         String updateTransQuery = "UPDATE Transactions SET return_date = CURDATE() WHERE transaction_id = ?";
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement updateStmt = conn.prepareStatement(updateTransQuery)) {
@@ -60,7 +61,6 @@ public class TransactionDAO {
             updateStmt.executeUpdate();
         }
 
-        // Update book availability
         String updateBookQuery = "UPDATE Books SET available_copies = available_copies + 1 WHERE book_id = (SELECT book_id FROM Transactions WHERE transaction_id = ?)";
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement updateStmt = conn.prepareStatement(updateBookQuery)) {
@@ -69,7 +69,37 @@ public class TransactionDAO {
         }
     }
 
-    public List<Transaction> getAllTransactions() throws SQLException {
+    public void updateTransaction(User user, int transactionId, int bookId, int memberId, int staffId) throws SQLException {
+        if (!user.hasRole("Admin")) {
+            throw new SecurityException("Only Admin can update transactions");
+        }
+        String query = "UPDATE Transactions SET book_id = ?, member_id = ?, staff_id = ? WHERE transaction_id = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            stmt.setInt(1, bookId);
+            stmt.setInt(2, memberId);
+            stmt.setInt(3, staffId);
+            stmt.setInt(4, transactionId);
+            stmt.executeUpdate();
+        }
+    }
+
+    public void deleteTransaction(User user, int transactionId) throws SQLException {
+        if (!user.hasRole("Admin")) {
+            throw new SecurityException("Only Admin can delete transactions");
+        }
+        String query = "DELETE FROM Transactions WHERE transaction_id = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            stmt.setInt(1, transactionId);
+            stmt.executeUpdate();
+        }
+    }
+
+    public List<Transaction> getAllTransactions(User user) throws SQLException {
+        if (!user.hasRole("Admin") && !user.hasRole("Staff")) {
+            throw new SecurityException("Only Admin or Staff can view all transactions");
+        }
         List<Transaction> transactions = new ArrayList<>();
         String query = "SELECT transaction_id, book_id, member_id, staff_id, issue_date, due_date, return_date, fine FROM Transactions";
         try (Connection conn = DatabaseConnection.getConnection();
@@ -89,5 +119,23 @@ public class TransactionDAO {
             }
         }
         return transactions;
+    }
+
+    public List<String> getOverdueBooks(User user) throws SQLException {
+        if (!user.hasRole("Admin") && !user.hasRole("Staff")) {
+            throw new SecurityException("Only Admin or Staff can view overdue books");
+        }
+        List<String> overdue = new ArrayList<>();
+        String query = "CALL GetOverdueBooks()";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query);
+             ResultSet rs = stmt.executeQuery()) {
+            while (rs.next()) {
+                overdue.add(String.format("Transaction ID: %d, Title: %s, Member: %s, Due: %s",
+                        rs.getInt("transaction_id"), rs.getString("title"),
+                        rs.getString("name"), rs.getDate("due_date").toString()));
+            }
+        }
+        return overdue;
     }
 }

@@ -21,4 +21,9 @@ public class User {
     public String getRole() { return role; }
     public Integer getMemberId() { return memberId; }
     public Integer getStaffId() { return staffId; }
+
+    // Check if user has a specific role
+    public boolean hasRole(String role) {
+        return this.role.equalsIgnoreCase(role);
+    }
 }
