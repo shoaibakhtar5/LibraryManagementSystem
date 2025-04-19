@@ -64,19 +64,19 @@ public class DashboardFrame extends JFrame {
         // Navigation Buttons
         if (user.hasRole("Admin")) {
             addNavButton(sidebar, "Manage Books", orange, white, "books.png", e -> showBookManagement());
-            addNavButton(sidebar, "Manage Members", orange, white, "members.png", e -> showPlaceholder("Members"));
+            addNavButton(sidebar, "Manage Members", orange, white, "members.png", e -> showMemberManagement());
             addNavButton(sidebar, "Manage Users", orange, white, "users.png", e -> showPlaceholder("Users"));
             addNavButton(sidebar, "Manage Staff", orange, white, "staff.png", e -> showPlaceholder("Staff"));
         }
         if (user.hasRole("Admin") || user.hasRole("Staff")) {
             addNavButton(sidebar, "Issue/Return Books", orange, white, "transactions.png", e -> showPlaceholder("Transactions"));
-            addNavButton(sidebar, "Manage Reservations", orange, white, "reservations.png", e -> showPlaceholder("Reservations"));
-            addNavButton(sidebar, "Manage Fines", orange, white, "fines.png", e -> showPlaceholder("Fines"));
+            addNavButton(sidebar, "Reservations", orange, white, "reservations.png", e -> showReservations());
+            addNavButton(sidebar, "Manage Fines", orange, white, "fines.png", e -> showFinesManagement());
         }
         if (user.hasRole("Member")) {
             addNavButton(sidebar, "View Books", orange, white, "books.png", e -> showBookManagement());
-            addNavButton(sidebar, "My Reservations", orange, white, "reservations.png", e -> showPlaceholder("My Reservations"));
-            addNavButton(sidebar, "My Fines", orange, white, "fines.png", e -> showPlaceholder("My Fines"));
+            addNavButton(sidebar, "My Reservations", orange, white, "reservations.png", e -> showReservations());
+            addNavButton(sidebar, "My Fines", orange, white, "fines.png", e -> showFinesManagement());
             addNavButton(sidebar, "Submit Review", orange, white, "reviews.png", e -> showPlaceholder("Reviews"));
         }
         addNavButton(sidebar, "Logout", orange, white, "logout.png", e -> logout());
@@ -116,6 +116,27 @@ public class DashboardFrame extends JFrame {
     private void showBookManagement() {
         contentPanel.removeAll();
         contentPanel.add(new BookManagementPanel(user));
+        contentPanel.revalidate();
+        contentPanel.repaint();
+    }
+
+    private void showMemberManagement() {
+        contentPanel.removeAll();
+        contentPanel.add(new MemberManagementPanel(user));
+        contentPanel.revalidate();
+        contentPanel.repaint();
+    }
+
+    private void showReservations() {
+        contentPanel.removeAll();
+        contentPanel.add(new ReservationsPanel(user));
+        contentPanel.revalidate();
+        contentPanel.repaint();
+    }
+
+    private void showFinesManagement() {
+        contentPanel.removeAll();
+        contentPanel.add(new FinesPanel(user));
         contentPanel.revalidate();
         contentPanel.repaint();
     }

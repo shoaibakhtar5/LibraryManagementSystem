@@ -4,26 +4,31 @@ import java.util.Date;
 
 public class Fine {
     private int fineId;
-    private int transactionId;
     private int memberId;
-    private double amount;
-    private String paymentStatus;
-    private Date paymentDate;
+    private String memberName;
+    private int bookId;
+    private String bookTitle;
+    private double fineAmount;
+    private Date fineDate;
+    private String status;
 
-    public Fine(int fineId, int transactionId, int memberId, double amount, String paymentStatus, Date paymentDate) {
+    public Fine(int fineId, int memberId, String memberName, int bookId, String bookTitle, double fineAmount, Date fineDate, String status) {
         this.fineId = fineId;
-        this.transactionId = transactionId;
         this.memberId = memberId;
-        this.amount = amount;
-        this.paymentStatus = paymentStatus;
-        this.paymentDate = paymentDate;
+        this.memberName = memberName;
+        this.bookId = bookId;
+        this.bookTitle = bookTitle;
+        this.fineAmount = fineAmount;
+        this.fineDate = fineDate;
+        this.status = status;
     }
 
-    // Getters
     public int getFineId() { return fineId; }
-    public int getTransactionId() { return transactionId; }
     public int getMemberId() { return memberId; }
-    public double getAmount() { return amount; }
-    public String getPaymentStatus() { return paymentStatus; }
-    public Date getPaymentDate() { return paymentDate; }
+    public String getMemberName() { return memberName; }
+    public int getBookId() { return bookId; }
+    public String getBookTitle() { return bookTitle; }
+    public double getFineAmount() { return fineAmount; }
+    public Date getFineDate() { return fineDate; }
+    public String getStatus() { return status; }
 }

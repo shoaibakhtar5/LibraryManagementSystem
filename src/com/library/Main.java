@@ -133,7 +133,7 @@ public class Main {
             }
 
             // Test ReservationsDAO
-            ReservationsDAO reservationsDAO = new ReservationsDAO();
+            ReservationDAO reservationsDAO = new ReservationDAO();
             try {
                 reservationsDAO.addReservation(member, 1, 1);
                 System.out.println("Member added reservation successfully");
@@ -141,8 +141,8 @@ public class Main {
                 System.out.println("Reservation add failed: " + e.getMessage());
             }
             try {
-                List<Reservation> reservations = reservationsDAO.getAllReservations(staff);
-                for (Reservation r : reservations) {
+                List<Reservation> reservation = reservationsDAO.getReservations(staff);
+                for (Reservation r : reservation) {
                     System.out.printf("Reservation ID: %d, Book ID: %d, Status: %s%n",
                             r.getReservationId(), r.getBookId(), r.getStatus());
                 }
@@ -153,7 +153,7 @@ public class Main {
             // Test FinesDAO
             FinesDAO finesDAO = new FinesDAO();
             try {
-                finesDAO.addFine(staff, 1, 1, 10.00);
+                finesDAO.payFine(staff, 1);
                 System.out.println("Staff added fine successfully");
             } catch (SecurityException | SQLException e) {
                 System.out.println("Fine add failed: " + e.getMessage());

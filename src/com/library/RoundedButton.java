@@ -36,7 +36,7 @@ public class RoundedButton extends JButton {
                 ImageIcon icon = new ImageIcon(getClass().getResource("/resources/" + iconPath));
                 setIcon(new ImageIcon(icon.getImage().getScaledInstance(24, 24, Image.SCALE_SMOOTH)));
             } catch (Exception e) {
-                System.out.println("Icon not found: " + iconPath);
+                System.out.println("Icon not found: " + iconPath); // Replaced printStackTrace()
             }
         }
     }
