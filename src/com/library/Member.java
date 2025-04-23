@@ -19,11 +19,15 @@ public class Member {
         this.address = address;
     }
 
-    // Getters
     public int getMemberId() { return memberId; }
     public String getName() { return name; }
     public String getEmail() { return email; }
     public String getPhone() { return phone; }
     public Date getJoinDate() { return joinDate; }
     public String getAddress() { return address; }
+
+    @Override
+    public String toString() {
+        return name; // Display the member name in the JComboBox
+    }
 }

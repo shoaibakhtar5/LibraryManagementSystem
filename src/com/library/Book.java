@@ -31,4 +31,9 @@ public class Book {
     public int getPublicationYear() { return publicationYear; }
     public int getTotalCopies() { return totalCopies; }
     public int getAvailableCopies() { return availableCopies; }
+
+    @Override
+    public String toString() {
+        return title; // Display the book title in the JComboBox
+    }
 }
