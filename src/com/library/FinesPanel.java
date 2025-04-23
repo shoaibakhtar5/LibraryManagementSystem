@@ -82,10 +82,16 @@ public class FinesPanel extends JPanel {
         buttonPanel.setBackground(white);
         buttonPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         if (user.hasRole("Admin") || user.hasRole("Staff")) {
-            RoundedButton payButton = new RoundedButton("Pay Fine", orange, white, "pay.png");
-            payButton.addActionListener(e -> payFine());
-            buttonPanel.add(payButton);
+            RoundedButton addFineButton = new RoundedButton("Add Fine", orange, white, "add.png");
+            addFineButton.addActionListener(e -> showAddFineDialog());
+            buttonPanel.add(addFineButton);
         }
+
+        // Add Pay Fine button for all users
+        RoundedButton payButton = new RoundedButton("Pay Fine", orange, white, "pay.png");
+        payButton.addActionListener(e -> payFine());
+        buttonPanel.add(payButton);
+
         RoundedButton refreshButton = new RoundedButton("Refresh", blue, white, "refresh.png");
         refreshButton.addActionListener(e -> refreshTable());
         buttonPanel.add(refreshButton);
@@ -95,22 +101,131 @@ public class FinesPanel extends JPanel {
         refreshTable();
     }
 
+    private void showAddFineDialog() {
+        JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this), "Add Fine", true);
+        dialog.setLayout(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(5, 5, 5, 5);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        dialog.add(new JLabel("Member ID:"), gbc);
+        gbc.gridx = 1;
+        JTextField memberIdField = new JTextField(10);
+        dialog.add(memberIdField, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 1;
+        dialog.add(new JLabel("Fine Amount:"), gbc);
+        gbc.gridx = 1;
+        JTextField fineAmountField = new JTextField(10);
+        dialog.add(fineAmountField, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 2;
+        dialog.add(new JLabel("Reason:"), gbc);
+        gbc.gridx = 1;
+        JTextField fineReasonField = new JTextField(20);
+        dialog.add(fineReasonField, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 3;
+        dialog.add(new JLabel("Transaction ID (Optional):"), gbc);
+        gbc.gridx = 1;
+        JTextField transactionIdField = new JTextField(10);
+        dialog.add(transactionIdField, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 4;
+        gbc.gridwidth = 2;
+        JButton submitButton = new JButton("Submit");
+        submitButton.addActionListener(e -> {
+            String memberIdStr = memberIdField.getText().trim();
+            String amountStr = fineAmountField.getText().trim();
+            String reason = fineReasonField.getText().trim();
+            String transactionIdStr = transactionIdField.getText().trim();
+
+            if (memberIdStr.isEmpty() || amountStr.isEmpty() || reason.isEmpty()) {
+                JOptionPane.showMessageDialog(dialog, "Member ID, fine amount, and reason are required", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            int memberId;
+            double amount;
+            Integer transactionId = null;
+            try {
+                memberId = Integer.parseInt(memberIdStr);
+                amount = Double.parseDouble(amountStr);
+                if (amount <= 0) {
+                    JOptionPane.showMessageDialog(dialog, "Fine amount must be greater than 0", "Error", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+                if (!transactionIdStr.isEmpty()) {
+                    long transactionIdLong = Long.parseLong(transactionIdStr);
+                    if (transactionIdLong < 1 || transactionIdLong > Integer.MAX_VALUE) {
+                        JOptionPane.showMessageDialog(dialog, "Transaction ID must be between 1 and " + Integer.MAX_VALUE, "Error", JOptionPane.ERROR_MESSAGE);
+                        return;
+                    }
+                    transactionId = (int) transactionIdLong;
+                }
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(dialog, "Invalid member ID, fine amount, or transaction ID", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            try {
+                finesDAO.addFine(user, memberId, amount, reason, transactionId);
+                JOptionPane.showMessageDialog(dialog, "Fine added successfully", "Success", JOptionPane.INFORMATION_MESSAGE);
+                dialog.dispose();
+                refreshTable();
+            } catch (SQLException sqlEx) {
+                String message = "Error adding fine: " + sqlEx.getMessage();
+                if (sqlEx.getMessage().contains("foreign key constraint fails")) {
+                    if (sqlEx.getMessage().contains("member_id")) {
+                        message = "Error adding fine: The specified member does not exist.";
+                    } else if (sqlEx.getMessage().contains("transaction_id")) {
+                        message = "Error adding fine: The provided transaction ID does not exist.";
+                    }
+                } else if (sqlEx.getMessage().contains("unknown column")) {
+                    message = "Error adding fine: Database schema mismatch. Please check the Fines table structure.";
+                } else if (sqlEx.getMessage().contains("Data truncated for column 'status'")) {
+                    message = "Error adding fine: Invalid status value. Expected 'Pending' or 'Paid'.";
+                }
+                JOptionPane.showMessageDialog(dialog, message, "Error", JOptionPane.ERROR_MESSAGE);
+            } catch (SecurityException secEx) {
+                JOptionPane.showMessageDialog(dialog, "Error adding fine: " + secEx.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        });
+        dialog.add(submitButton, gbc);
+
+        dialog.pack();
+        dialog.setLocationRelativeTo(this);
+        dialog.setVisible(true);
+    }
+
     private void searchFines() {
         String searchText = searchField.getText().trim().toLowerCase();
         tableModel.setRowCount(0);
         try {
-            List<Fine> fines = finesDAO.getFines(user);
+            List<Fine> fines;
+            if (user.hasRole("Member")) {
+                fines = finesDAO.getFinesByMember(user.getMemberId());
+            } else {
+                fines = finesDAO.getAllFines();
+            }
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
             for (Fine fine : fines) {
-                if (fine.getMemberName().toLowerCase().contains(searchText) ||
-                        fine.getBookTitle().toLowerCase().contains(searchText)) {
+                String memberName = fine.getMemberName() != null ? fine.getMemberName().toLowerCase() : "";
+                String bookTitle = fine.getBookTitle() != null ? fine.getBookTitle().toLowerCase() : "";
+                if (memberName.contains(searchText) || bookTitle.contains(searchText)) {
                     tableModel.addRow(new Object[]{
                             fine.getFineId(),
                             fine.getMemberId(),
                             fine.getMemberName(),
                             fine.getBookId(),
                             fine.getBookTitle(),
-                            fine.getFineAmount(),
+                            fine.getAmount(),
                             sdf.format(fine.getFineDate()),
                             fine.getStatus()
                     });
@@ -135,8 +250,8 @@ public class FinesPanel extends JPanel {
 
         int fineId = (int) tableModel.getValueAt(selectedRow, 0);
         String status = (String) tableModel.getValueAt(selectedRow, 7);
-        if (status.equals("Paid")) {
-            JOptionPane.showMessageDialog(this, "Fine already paid", "Error", JOptionPane.ERROR_MESSAGE);
+        if ("Paid".equalsIgnoreCase(status)) {
+            JOptionPane.showMessageDialog(this, "Fine is already paid", "Error", JOptionPane.ERROR_MESSAGE);
             return;
         }
 
@@ -148,6 +263,8 @@ public class FinesPanel extends JPanel {
                 refreshTable();
             } catch (SQLException e) {
                 JOptionPane.showMessageDialog(this, "Error paying fine: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            } catch (SecurityException secEx) {
+                JOptionPane.showMessageDialog(this, "Error paying fine: " + secEx.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
             }
         }
     }

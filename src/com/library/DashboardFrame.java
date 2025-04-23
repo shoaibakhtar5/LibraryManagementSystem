@@ -143,9 +143,50 @@ public class DashboardFrame extends JFrame {
 
     private void showPlaceholder(String section) {
         contentPanel.removeAll();
-        JLabel label = new JLabel("Placeholder: " + section + " Management", SwingConstants.CENTER);
-        label.setFont(new Font("Arial", Font.PLAIN, 24));
-        contentPanel.add(label);
+        JPanel imagePanel = new JPanel(new BorderLayout());
+        imagePanel.setBackground(Color.WHITE);
+
+        try {
+            // Load the custom image from resources
+            ImageIcon originalIcon = new ImageIcon(getClass().getResource("/resources/dashboard_background.png"));
+            if (originalIcon.getIconWidth() == -1) {
+                throw new Exception("Image not found");
+            }
+
+            // Scale the image to fit the panel while maintaining aspect ratio
+            JLabel imageLabel = new JLabel() {
+                @Override
+                protected void paintComponent(Graphics g) {
+                    super.paintComponent(g);
+                    Image image = originalIcon.getImage();
+                    int panelWidth = getWidth();
+                    int panelHeight = getHeight();
+                    int imageWidth = originalIcon.getIconWidth();
+                    int imageHeight = originalIcon.getIconHeight();
+
+                    // Calculate scaling factor to fit the panel
+                    double scale = Math.min((double) panelWidth / imageWidth, (double) panelHeight / imageHeight);
+                    int scaledWidth = (int) (imageWidth * scale);
+                    int scaledHeight = (int) (imageHeight * scale);
+
+                    // Center the image
+                    int x = (panelWidth - scaledWidth) / 2;
+                    int y = (panelHeight - scaledHeight) / 2;
+
+                    g.drawImage(image, x, y, scaledWidth, scaledHeight, this);
+                }
+            };
+
+            imagePanel.add(imageLabel, BorderLayout.CENTER);
+        } catch (Exception e) {
+            // Fallback to a default label if image loading fails
+            JLabel fallbackLabel = new JLabel("Welcome to the Library Management System", SwingConstants.CENTER);
+            fallbackLabel.setFont(new Font("Arial", Font.PLAIN, 24));
+            imagePanel.add(fallbackLabel, BorderLayout.CENTER);
+            System.out.println("Failed to load dashboard image: " + e.getMessage());
+        }
+
+        contentPanel.add(imagePanel, BorderLayout.CENTER);
         contentPanel.revalidate();
         contentPanel.repaint();
     }

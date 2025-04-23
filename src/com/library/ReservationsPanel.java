@@ -3,8 +3,10 @@ package com.library;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.awt.event.ItemEvent;
 import java.sql.SQLException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.List;
 
 import static java.awt.Color.orange;
@@ -151,12 +153,13 @@ public class ReservationsPanel extends JPanel {
         bookComboBox.setFont(new Font("Arial", Font.PLAIN, 16));
         memberComboBox.setFont(new Font("Arial", Font.PLAIN, 16));
 
+        JTextField bookSearchField = new JTextField(20);
+        bookSearchField.setFont(new Font("Arial", Font.PLAIN, 16));
+        List<Book> allBooks = new ArrayList<>();
         try {
-            List<Book> books = bookDAO.getAllBooks(user);
-            for (Book book : books) {
-                if (book.getAvailableCopies() > 0) {
-                    bookComboBox.addItem(book);
-                }
+            allBooks = bookDAO.getAllBooks(user);
+            for (Book book : allBooks) {
+                bookComboBox.addItem(book);
             }
             if (!user.hasRole("Member")) {
                 List<Member> members = memberDAO.getAllMembers(user);
@@ -169,15 +172,74 @@ public class ReservationsPanel extends JPanel {
             return;
         }
 
+        // Search bar for books
+        List<Book> finalAllBooks = allBooks;
+        bookSearchField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            public void insertUpdate(javax.swing.event.DocumentEvent e) { filterBooks(); }
+            public void removeUpdate(javax.swing.event.DocumentEvent e) { filterBooks(); }
+            public void changedUpdate(javax.swing.event.DocumentEvent e) { filterBooks(); }
+
+            private void filterBooks() {
+                String searchText = bookSearchField.getText().trim().toLowerCase();
+                bookComboBox.removeAllItems();
+                for (Book book : finalAllBooks) {
+                    if (book.getTitle().toLowerCase().contains(searchText)) {
+                        bookComboBox.addItem(book);
+                    }
+                }
+            }
+        });
+
+        JTextField memberIdField = new JTextField(20);
+        JTextField memberNameField = new JTextField(20);
+        memberIdField.setFont(new Font("Arial", Font.PLAIN, 16));
+        memberNameField.setFont(new Font("Arial", Font.PLAIN, 16));
+        memberIdField.setEditable(false);
+        memberNameField.setEditable(false);
+
+        // Update member fields based on user role
+        if (user.hasRole("Member")) {
+            memberIdField.setText(String.valueOf(user.getMemberId()));
+            try {
+                Member member = memberDAO.getMemberById(user, user.getMemberId());
+                memberNameField.setText(member.getName());
+            } catch (SQLException e) {
+                JOptionPane.showMessageDialog(dialog, "Error loading member data: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+        } else {
+            memberComboBox.addItemListener(e -> {
+                if (e.getStateChange() == ItemEvent.SELECTED) {
+                    Member selectedMember = (Member) e.getItem();
+                    memberIdField.setText(String.valueOf(selectedMember.getMemberId()));
+                    memberNameField.setText(selectedMember.getName());
+                }
+            });
+        }
+
+        // Select the first item in the combo boxes to populate fields initially
+        if (bookComboBox.getItemCount() > 0) {
+            bookComboBox.setSelectedIndex(0);
+        }
+        if (!user.hasRole("Member") && memberComboBox.getItemCount() > 0) {
+            memberComboBox.setSelectedIndex(0);
+        }
+
         gbc.gridx = 0;
         gbc.gridy = 0;
-        dialog.add(new JLabel("Book:", SwingConstants.RIGHT), gbc);
+        dialog.add(new JLabel("Search Book:", SwingConstants.RIGHT), gbc);
+        gbc.gridx = 1;
+        dialog.add(bookSearchField, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 1;
+        dialog.add(new JLabel("Select Book:", SwingConstants.RIGHT), gbc);
         gbc.gridx = 1;
         dialog.add(bookComboBox, gbc);
 
         gbc.gridx = 0;
-        gbc.gridy = 1;
-        dialog.add(new JLabel("Member:", SwingConstants.RIGHT), gbc);
+        gbc.gridy = 2;
+        dialog.add(new JLabel("Select Member:", SwingConstants.RIGHT), gbc);
         gbc.gridx = 1;
         if (user.hasRole("Member")) {
             JTextField memberField = new JTextField(user.getUsername(), 20);
@@ -189,7 +251,19 @@ public class ReservationsPanel extends JPanel {
         }
 
         gbc.gridx = 0;
-        gbc.gridy = 2;
+        gbc.gridy = 3;
+        dialog.add(new JLabel("Member ID:", SwingConstants.RIGHT), gbc);
+        gbc.gridx = 1;
+        dialog.add(memberIdField, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 4;
+        dialog.add(new JLabel("Member Name:", SwingConstants.RIGHT), gbc);
+        gbc.gridx = 1;
+        dialog.add(memberNameField, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 5;
         gbc.gridwidth = 2;
         RoundedButton saveButton = new RoundedButton("Save", orange, white, "save.png");
         saveButton.addActionListener(e -> {
@@ -201,7 +275,11 @@ public class ReservationsPanel extends JPanel {
             }
             try {
                 reservationDAO.addReservation(user, selectedBook.getBookId(), memberId);
-                JOptionPane.showMessageDialog(dialog, "Reservation added", "Success", JOptionPane.INFORMATION_MESSAGE);
+                if (user.hasRole("Member")) {
+                    JOptionPane.showMessageDialog(dialog, "Reserved successfully, return the book after 1 week otherwise you will be fined.", "Success", JOptionPane.INFORMATION_MESSAGE);
+                } else {
+                    JOptionPane.showMessageDialog(dialog, "Reservation added", "Success", JOptionPane.INFORMATION_MESSAGE);
+                }
                 dialog.dispose();
                 refreshTable();
             } catch (SQLException ex) {

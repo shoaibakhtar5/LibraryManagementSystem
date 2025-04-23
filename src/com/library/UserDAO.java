@@ -7,8 +7,17 @@ import java.sql.SQLException;
 
 public class UserDAO {
     public User authenticate(String username, String password, String role) throws SQLException {
-        // No role check; all users can authenticate
-        String query = "SELECT user_id, username, role, member_id, staff_id FROM Users WHERE username = ? AND password = ? AND role = ?";
+        String query;
+        if (role.equalsIgnoreCase("Member")) {
+            query = "SELECT u.user_id, u.username, u.role, u.member_id, u.staff_id " +
+                    "FROM Users u " +
+                    "JOIN Members m ON u.member_id = m.member_id " +
+                    "WHERE u.username = ? AND u.password = ? AND u.role = ?";
+        } else {
+            query = "SELECT user_id, username, role, member_id, staff_id " +
+                    "FROM Users " +
+                    "WHERE username = ? AND password = ? AND role = ?";
+        }
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(query)) {
             stmt.setString(1, username);

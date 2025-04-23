@@ -1,34 +1,69 @@
 package com.library;
 
-import java.util.Date;
+import java.sql.Date;
 
 public class Fine {
     private int fineId;
     private int memberId;
     private String memberName;
-    private int bookId;
-    private String bookTitle;
-    private double fineAmount;
+    private double fineAmount; // Renamed from amount
+    private String reason;
     private Date fineDate;
     private String status;
+    private Integer transactionId;
+    private Integer bookId;
+    private String bookTitle;
 
-    public Fine(int fineId, int memberId, String memberName, int bookId, String bookTitle, double fineAmount, Date fineDate, String status) {
+    public Fine(int fineId, int memberId, String memberName, double fineAmount, String reason, Date fineDate, String status, Integer transactionId, Integer bookId, String bookTitle) {
         this.fineId = fineId;
         this.memberId = memberId;
         this.memberName = memberName;
-        this.bookId = bookId;
-        this.bookTitle = bookTitle;
         this.fineAmount = fineAmount;
+        this.reason = reason;
         this.fineDate = fineDate;
         this.status = status;
+        this.transactionId = transactionId;
+        this.bookId = bookId;
+        this.bookTitle = bookTitle;
     }
 
-    public int getFineId() { return fineId; }
-    public int getMemberId() { return memberId; }
-    public String getMemberName() { return memberName; }
-    public int getBookId() { return bookId; }
-    public String getBookTitle() { return bookTitle; }
-    public double getFineAmount() { return fineAmount; }
-    public Date getFineDate() { return fineDate; }
-    public String getStatus() { return status; }
+    public int getFineId() {
+        return fineId;
+    }
+
+    public int getMemberId() {
+        return memberId;
+    }
+
+    public String getMemberName() {
+        return memberName;
+    }
+
+    public double getAmount() { // Keep this for backward compatibility
+        return fineAmount;
+    }
+
+    public String getReason() {
+        return reason;
+    }
+
+    public Date getFineDate() {
+        return fineDate;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public Integer getTransactionId() {
+        return transactionId;
+    }
+
+    public Integer getBookId() {
+        return bookId;
+    }
+
+    public String getBookTitle() {
+        return bookTitle;
+    }
 }

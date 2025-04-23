@@ -14,15 +14,13 @@ public class Main {
             // Test MemberDAO
             MemberDAO memberDAO = new MemberDAO();
             try {
-                memberDAO.addMember(admin, "New Member", "new@example.com", "1234567890", "123 Main St");
+                memberDAO.addMember(admin, "New Member", "new@example.com", "1234567890", "123 Main St", "newmember", "password123");
                 System.out.println("Admin added member successfully");
-            } catch (SQLException e) {
-                System.out.println("Member add failed: " + e.getMessage());
             } catch (SecurityException e) {
                 System.out.println("Member add failed: " + e.getMessage());
             }
             try {
-                memberDAO.addMember(member, "Invalid Member", "invalid@example.com", "0987654321", "456 Main St");
+                memberDAO.addMember(member, "Invalid Member", "invalid@example.com", "0987654321", "456 Main St", "invalidmember", "password456");
             } catch (SecurityException e) {
                 System.out.println("Member member add failed: " + e.getMessage());
             }
