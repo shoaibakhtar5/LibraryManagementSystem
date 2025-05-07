@@ -7,9 +7,11 @@ import java.awt.geom.RoundRectangle2D;
 public class RoundedButton extends JButton {
     private Color hoverBackground;
     private Color normalBackground;
+    private String fullText; // Store full button text
 
     public RoundedButton(String text, Color bg, Color fg) {
         super(text);
+        this.fullText = text;
         this.normalBackground = bg;
         this.hoverBackground = bg.brighter();
         setForeground(fg);
@@ -23,6 +25,7 @@ public class RoundedButton extends JButton {
             public void mouseEntered(java.awt.event.MouseEvent evt) {
                 setBackground(hoverBackground);
             }
+
             public void mouseExited(java.awt.event.MouseEvent evt) {
                 setBackground(normalBackground);
             }
@@ -39,6 +42,15 @@ public class RoundedButton extends JButton {
                 System.out.println("Icon not found: " + iconPath);
             }
         }
+    }
+
+    // Method to show/hide full text
+    public void setFullTextVisible(boolean visible) {
+        super.setText(visible ? fullText : "");
+    }
+
+    public String getFullText() {
+        return fullText;
     }
 
     @Override

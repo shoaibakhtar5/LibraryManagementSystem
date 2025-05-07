@@ -106,7 +106,7 @@ public class DashboardFrame extends JFrame {
         sidebar.setPreferredSize(new Dimension(sidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH, 0));
         for (Component comp : sidebar.getComponents()) {
             if (comp instanceof RoundedButton && !comp.equals(sidebar.getComponent(0))) {
-                ((RoundedButton) comp).setText(sidebarCollapsed ? "" : ((RoundedButton) comp).getText());
+                ((RoundedButton) comp).setFullTextVisible(!sidebarCollapsed);
             }
         }
         sidebar.revalidate();
@@ -147,13 +147,11 @@ public class DashboardFrame extends JFrame {
         imagePanel.setBackground(Color.WHITE);
 
         try {
-            // Load the custom image from resources
             ImageIcon originalIcon = new ImageIcon(getClass().getResource("/resources/dashboard_background.png"));
             if (originalIcon.getIconWidth() == -1) {
                 throw new Exception("Image not found");
             }
 
-            // Scale the image to fit the panel while maintaining aspect ratio
             JLabel imageLabel = new JLabel() {
                 @Override
                 protected void paintComponent(Graphics g) {
@@ -164,12 +162,10 @@ public class DashboardFrame extends JFrame {
                     int imageWidth = originalIcon.getIconWidth();
                     int imageHeight = originalIcon.getIconHeight();
 
-                    // Calculate scaling factor to fit the panel
                     double scale = Math.min((double) panelWidth / imageWidth, (double) panelHeight / imageHeight);
                     int scaledWidth = (int) (imageWidth * scale);
                     int scaledHeight = (int) (imageHeight * scale);
 
-                    // Center the image
                     int x = (panelWidth - scaledWidth) / 2;
                     int y = (panelHeight - scaledHeight) / 2;
 
@@ -179,7 +175,6 @@ public class DashboardFrame extends JFrame {
 
             imagePanel.add(imageLabel, BorderLayout.CENTER);
         } catch (Exception e) {
-            // Fallback to a default label if image loading fails
             JLabel fallbackLabel = new JLabel("Welcome to the Library Management System", SwingConstants.CENTER);
             fallbackLabel.setFont(new Font("Arial", Font.PLAIN, 24));
             imagePanel.add(fallbackLabel, BorderLayout.CENTER);
