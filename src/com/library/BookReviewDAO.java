@@ -1,44 +1,50 @@
 package com.library;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
+import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
+import java.util.Optional;
 
 public class BookReviewDAO {
-    public void addReview(User user, int bookId, int memberId, int rating, String comment) throws SQLException {
-        if (!user.hasRole("Admin") && (!user.hasRole("Member") || user.getMemberId() == null || user.getMemberId() != memberId)) {
-            throw new SecurityException("Only Admin or the Member who owns the review can add reviews");
-        }
-        String query = "INSERT INTO Book_Reviews (book_id, member_id, rating, comment, review_date) VALUES (?, ?, ?, ?, CURDATE())";
+    private static final String INSERT_REVIEW_SQL = """
+        INSERT INTO Book_Reviews (book_id, member_id, rating, comment, review_date) 
+        VALUES (?, ?, ?, ?, ?)""";
+
+    private static final String UPDATE_REVIEW_SQL = """
+        UPDATE Book_Reviews SET rating = ?, comment = ? 
+        WHERE review_id = ?""";
+
+    private static final String DELETE_REVIEW_SQL = "DELETE FROM Book_Reviews WHERE review_id = ?";
+
+    private static final String SELECT_REVIEWS_BY_BOOK_SQL = """
+        SELECT review_id, book_id, member_id, rating, comment, review_date 
+        FROM Book_Reviews WHERE book_id = ?""";
+
+    private static final String CHECK_REVIEW_OWNER_SQL = """
+        SELECT member_id FROM Book_Reviews WHERE review_id = ?""";
+
+    private static final String GET_AVERAGE_RATING_SQL = "CALL GetAverageBookRating(?)";
+
+    public void addReview(User user, int memberId, int bookId, int rating, String comment) throws SQLException {
+        validateReviewAccess(user, memberId, null);
+
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(query)) {
+             PreparedStatement stmt = conn.prepareStatement(INSERT_REVIEW_SQL)) {
             stmt.setInt(1, bookId);
             stmt.setInt(2, memberId);
             stmt.setInt(3, rating);
             stmt.setString(4, comment);
+            stmt.setDate(5, Date.valueOf(LocalDate.now())); // Use current date for review_date
             stmt.executeUpdate();
         }
     }
 
     public void updateReview(User user, int reviewId, int rating, String comment) throws SQLException {
-        if (!user.hasRole("Admin")) {
-            String checkQuery = "SELECT member_id FROM Book_Reviews WHERE review_id = ?";
-            try (Connection conn = DatabaseConnection.getConnection();
-                 PreparedStatement checkStmt = conn.prepareStatement(checkQuery)) {
-                checkStmt.setInt(1, reviewId);
-                ResultSet rs = checkStmt.executeQuery();
-                if (!rs.next() || user.getMemberId() == null || rs.getInt("member_id") != user.getMemberId()) {
-                    throw new SecurityException("Only Admin or the Member who owns the review can update reviews");
-                }
-            }
-        }
-        String query = "UPDATE Book_Reviews SET rating = ?, comment = ? WHERE review_id = ?";
+        validateReviewAccess(user, null, reviewId);
+
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(query)) {
+             PreparedStatement stmt = conn.prepareStatement(UPDATE_REVIEW_SQL)) {
             stmt.setInt(1, rating);
             stmt.setString(2, comment);
             stmt.setInt(3, reviewId);
@@ -47,59 +53,99 @@ public class BookReviewDAO {
     }
 
     public void deleteReview(User user, int reviewId) throws SQLException {
-        if (!user.hasRole("Admin")) {
-            String checkQuery = "SELECT member_id FROM Book_Reviews WHERE review_id = ?";
-            try (Connection conn = DatabaseConnection.getConnection();
-                 PreparedStatement checkStmt = conn.prepareStatement(checkQuery)) {
-                checkStmt.setInt(1, reviewId);
-                ResultSet rs = checkStmt.executeQuery();
-                if (!rs.next() || user.getMemberId() == null || rs.getInt("member_id") != user.getMemberId()) {
-                    throw new SecurityException("Only Admin or the Member who owns the review can delete reviews");
-                }
-            }
-        }
-        String query = "DELETE FROM Book_Reviews WHERE review_id = ?";
+        validateReviewAccess(user, null, reviewId);
+
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(query)) {
+             PreparedStatement stmt = conn.prepareStatement(DELETE_REVIEW_SQL)) {
             stmt.setInt(1, reviewId);
             stmt.executeUpdate();
         }
     }
 
-    public List<BookReview> getReviewsByBook(User user, int bookId) throws SQLException {
-        // All roles can view reviews
-        List<BookReview> reviews = new ArrayList<>();
-        String query = "SELECT review_id, book_id, member_id, rating, comment, review_date FROM Book_Reviews WHERE book_id = ?";
+    public List<BookReview> getReviewsByBook(int bookId) throws SQLException {
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(query)) {
+             PreparedStatement stmt = conn.prepareStatement(SELECT_REVIEWS_BY_BOOK_SQL)) {
             stmt.setInt(1, bookId);
-            ResultSet rs = stmt.executeQuery();
-            while (rs.next()) {
-                reviews.add(new BookReview(
-                        rs.getInt("review_id"),
-                        rs.getInt("book_id"),
-                        rs.getInt("member_id"),
-                        rs.getInt("rating"),
-                        rs.getString("comment"),
-                        rs.getDate("review_date")
-                ));
+            try (ResultSet rs = stmt.executeQuery()) {
+                List<BookReview> reviews = new ArrayList<>();
+                while (rs.next()) {
+                    reviews.add(new BookReview(
+                            rs.getInt("review_id"),
+                            rs.getInt("book_id"),
+                            rs.getInt("member_id"),
+                            rs.getInt("rating"),
+                            rs.getString("comment"),
+                            rs.getDate("review_date").toLocalDate()
+                    ));
+                }
+                return reviews;
             }
         }
-        return reviews;
     }
 
-    public String getAverageRating(User user, int bookId) throws SQLException {
-        // All roles can view average rating
-        String query = "CALL GetAverageBookRating(?)";
+    public Optional<ReviewStats> getAverageRating(int bookId) throws SQLException {
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(query)) {
+             PreparedStatement stmt = conn.prepareStatement(GET_AVERAGE_RATING_SQL)) {
             stmt.setInt(1, bookId);
-            ResultSet rs = stmt.executeQuery();
-            if (rs.next()) {
-                return String.format("Book: %s, Average Rating: %.2f, Reviews: %d",
-                        rs.getString("title"), rs.getDouble("average_rating"), rs.getInt("review_count"));
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return Optional.of(new ReviewStats(
+                            rs.getString("title"),
+                            rs.getDouble("average_rating"),
+                            rs.getInt("review_count")
+                    ));
+                }
             }
         }
-        return "No reviews found";
+        return Optional.empty();
+    }
+
+    private void validateReviewAccess(User user, Integer memberId, Integer reviewId)
+            throws SQLException {
+        if (user.hasRole("Admin")) return;
+
+        if (!user.hasRole("Member") || user.getMemberId() == null) {
+            throw new SecurityException("Unauthorized access");
+        }
+
+        if (reviewId != null) {
+            // For update/delete, check if user owns the review
+            try (Connection conn = DatabaseConnection.getConnection();
+                 PreparedStatement stmt = conn.prepareStatement(CHECK_REVIEW_OWNER_SQL)) {
+                stmt.setInt(1, reviewId);
+                try (ResultSet rs = stmt.executeQuery()) {
+                    if (!rs.next() || rs.getInt("member_id") != user.getMemberId()) {
+                        throw new SecurityException("You can only modify your own reviews");
+                    }
+                }
+            }
+        } else if (memberId != null && memberId != user.getMemberId()) {
+            // For create, check if memberId matches user's memberId
+            throw new SecurityException("You can only create reviews for yourself");
+        }
+    }
+}
+
+// Stats container
+class ReviewStats {
+    private final String title;
+    private final double averageRating;
+    private final int reviewCount;
+
+    public ReviewStats(String title, double averageRating, int reviewCount) {
+        this.title = title;
+        this.averageRating = averageRating;
+        this.reviewCount = reviewCount;
+    }
+
+    // Getters
+    public String getTitle() { return title; }
+    public double getAverageRating() { return averageRating; }
+    public int getReviewCount() { return reviewCount; }
+
+    @Override
+    public String toString() {
+        return String.format("%s - Average: %.1f (%d reviews)",
+                title, averageRating, reviewCount);
     }
 }
