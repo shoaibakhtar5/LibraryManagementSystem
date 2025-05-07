@@ -8,7 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class BookDAO {
-    public void addBook(User user, String title, String isbn, int categoryId, int publisherId, int publicationYear, int totalCopies) throws SQLException {
+    public void addBook(User user, String title, String isbn, int categoryId, String publisherName, int publicationYear, int totalCopies) throws SQLException {
         if (!user.hasRole("Admin")) {
             throw new SecurityException("Only Admin can add books");
         }
@@ -22,9 +22,11 @@ public class BookDAO {
             }
         }
 
+        Connection conn = null;
+        int publisherId = getOrCreatePublisherId(String.valueOf(publisherName), conn);
+
         String query = "INSERT INTO Books (title, isbn, category_id, publisher_id, publication_year, total_copies, available_copies) VALUES (?, ?, ?, ?, ?, ?, ?)";
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(query)) {
+        try (PreparedStatement stmt = conn.prepareStatement(query)) {
             stmt.setString(1, title);
             stmt.setString(2, isbn);
             stmt.setInt(3, categoryId);
@@ -34,6 +36,28 @@ public class BookDAO {
             stmt.setInt(7, totalCopies);
             stmt.executeUpdate();
         }
+    }
+
+    private int getOrCreatePublisherId(String publisherName, Connection conn) throws SQLException {
+        String checkQuery = "SELECT publisher_id FROM Publishers WHERE publisher_name = ?";
+        try (PreparedStatement checkStmt = conn.prepareStatement(checkQuery)) {
+            checkStmt.setString(1, publisherName);
+            ResultSet rs = checkStmt.executeQuery();
+            if (rs.next()) {
+                return rs.getInt("publisher_id");
+            }
+        }
+
+        String insertQuery = "INSERT INTO Publishers (publisher_name) VALUES (?)";
+        try (PreparedStatement insertStmt = conn.prepareStatement(insertQuery, PreparedStatement.RETURN_GENERATED_KEYS)) {
+            insertStmt.setString(1, publisherName);
+            insertStmt.executeUpdate();
+            ResultSet generatedKeys = insertStmt.getGeneratedKeys();
+            if (generatedKeys.next()) {
+                return generatedKeys.getInt(1);
+            }
+        }
+        throw new SQLException("Failed to create new publisher");
     }
 
     public void updateBook(User user, int bookId, String title, String isbn, int categoryId, int publisherId, int publicationYear, int totalCopies) throws SQLException {

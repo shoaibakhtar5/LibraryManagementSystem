@@ -115,7 +115,7 @@ public class Main {
             // Test BookDAO
             BookDAO bookDAO = new BookDAO();
             try {
-                bookDAO.addBook(admin, "New Book", "9780987654321", 1, 1, 2023, 5);
+                bookDAO.addBook(admin, "New Book", "9780987654321", 1, String.valueOf(1), 2023, 5);
                 System.out.println("Admin added book successfully");
             } catch (SecurityException | SQLException e) {
                 System.out.println("Book add failed: " + e.getMessage());
