@@ -1,36 +1,49 @@
 package com.library;
 
 import javax.swing.*;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableColumnModel;
+import javax.swing.table.TableRowSorter;
 import java.awt.*;
-import java.sql.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.text.SimpleDateFormat;
+import java.util.Comparator;
 import java.util.List;
 
 public class MemberManagementPanel extends JPanel {
-    private final User user;
-    private DefaultTableModel tableModel;
-    private JTextField nameField, emailField, phoneField, addressField, usernameField;
-    private JPasswordField passwordField;
+    private static final Color blue = new Color(0, 87, 183);
+    private static final Color orange = new Color(255, 98, 0);
+    private static final Color white = Color.WHITE;
+
+    private User user;
+    private MemberDAO memberDAO;
     private JTable membersTable;
+    private DefaultTableModel tableModel;
+    private JTextField searchField;
 
     public MemberManagementPanel(User user) {
         if (user == null) {
             throw new IllegalArgumentException("User cannot be null");
         }
         this.user = user;
+        this.memberDAO = new MemberDAO();
+        if (this.memberDAO == null) {
+            JOptionPane.showMessageDialog(this, "Failed to instantiate MemberDAO", "Error", JOptionPane.ERROR_MESSAGE);
+        }
         initUI();
     }
 
     private void initUI() {
         setLayout(new BorderLayout());
-        setBackground(Color.WHITE);
+        setBackground(white);
 
-        // Colors
-        Color blue = new Color(0, 87, 183);
-        Color orange = new Color(255, 98, 0);
-        Color white = Color.WHITE;
-
-        // Header
+        // Gradient Header
         JPanel headerPanel = new JPanel() {
             @Override
             protected void paintComponent(Graphics g) {
@@ -44,160 +57,403 @@ public class MemberManagementPanel extends JPanel {
         };
         headerPanel.setLayout(new BorderLayout());
         JLabel headerLabel = new JLabel("Member Management", SwingConstants.CENTER);
-        headerLabel.setFont(new Font("Arial", Font.BOLD, 24));
+        headerLabel.setFont(new Font("Arial", Font.BOLD, 28));
         headerLabel.setForeground(white);
+        headerLabel.setBorder(BorderFactory.createEmptyBorder(15, 0, 15, 0));
         headerPanel.add(headerLabel, BorderLayout.CENTER);
         add(headerPanel, BorderLayout.NORTH);
 
-        // Input Panel
-        JPanel inputPanel = new JPanel(new GridBagLayout());
-        inputPanel.setBackground(white);
+        // Search Panel
+        JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        searchPanel.setBackground(white);
+        searchPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        JLabel searchLabel = new JLabel();
+        try {
+            ImageIcon icon = new ImageIcon(getClass().getResource("/resources/search.png"));
+            searchLabel.setIcon(new ImageIcon(icon.getImage().getScaledInstance(24, 24, Image.SCALE_SMOOTH)));
+        } catch (Exception e) {
+            searchLabel.setText("🔍");
+        }
+        searchPanel.add(searchLabel);
+        searchField = new JTextField(20);
+        searchField.setFont(new Font("Arial", Font.PLAIN, 18));
+        searchField.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(200, 200, 200)),
+                BorderFactory.createEmptyBorder(5, 5, 5, 5)
+        ));
+        searchField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            public void insertUpdate(javax.swing.event.DocumentEvent e) { searchMembers(); }
+            public void removeUpdate(javax.swing.event.DocumentEvent e) { searchMembers(); }
+            public void changedUpdate(javax.swing.event.DocumentEvent e) { searchMembers(); }
+        });
+        searchPanel.add(searchField);
+        add(searchPanel, BorderLayout.NORTH, 1);
+
+        // Table
+        String[] columns = {"ID", "Name", "Email", "Phone", "Join Date", "Address"};
+        tableModel = new DefaultTableModel(columns, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+        membersTable = new JTable(tableModel);
+        membersTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        membersTable.setFont(new Font("Arial", Font.PLAIN, 16));
+        membersTable.setRowHeight(30);
+        membersTable.setShowGrid(true); // Enable grid lines
+        membersTable.setGridColor(Color.LIGHT_GRAY); // Set grid color
+        membersTable.setBorder(BorderFactory.createLineBorder(Color.BLACK, 1)); // Add border
+        membersTable.setIntercellSpacing(new Dimension(1, 1)); // Small spacing
+        membersTable.setBackground(white);
+        membersTable.setSelectionBackground(new Color(230, 240, 255));
+        membersTable.setSelectionForeground(Color.BLACK);
+
+        // Table Header Styling
+        membersTable.getTableHeader().setFont(new Font("Arial", Font.BOLD, 16));
+        membersTable.getTableHeader().setBackground(new Color(240, 240, 240));
+        membersTable.getTableHeader().setForeground(Color.BLACK);
+        membersTable.getTableHeader().setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, new Color(200, 200, 200)));
+
+        // Alternating Row Colors
+        membersTable.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
+            @Override
+            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+                Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+                if (!isSelected) {
+                    c.setBackground(row % 2 == 0 ? white : new Color(245, 245, 245));
+                }
+                return c;
+            }
+        });
+
+        // Column Alignment
+        DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
+        centerRenderer.setHorizontalAlignment(JLabel.CENTER);
+        TableColumnModel columnModel = membersTable.getColumnModel();
+        columnModel.getColumn(0).setCellRenderer(centerRenderer); // ID
+        columnModel.getColumn(3).setCellRenderer(centerRenderer); // Phone
+
+        // Sort by Member ID
+        TableRowSorter<DefaultTableModel> sorter = new TableRowSorter<>(tableModel);
+        membersTable.setRowSorter(sorter);
+        sorter.setSortKeys(List.of(new RowSorter.SortKey(0, SortOrder.ASCENDING))); // Default sort by ID
+        sorter.sort();
+
+        // Selection Listener
+        membersTable.getSelectionModel().addListSelectionListener(e -> {
+            int selectedRow = membersTable.getSelectedRow();
+            if (selectedRow >= 0 && !e.getValueIsAdjusting()) {
+                // No input fields to populate here, as we align with BookManagementPanel style
+            }
+        });
+
+        // Mouse Click for Selection
+        membersTable.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                int row = membersTable.rowAtPoint(e.getPoint());
+                if (row >= 0) {
+                    membersTable.setRowSelectionInterval(row, row);
+                }
+            }
+        });
+
+        JScrollPane scrollPane = new JScrollPane(membersTable);
+        scrollPane.setBorder(BorderFactory.createEmptyBorder());
+        add(scrollPane, BorderLayout.CENTER);
+
+        // Button Panel
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        buttonPanel.setBackground(white);
+        buttonPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        if (user.hasRole("Admin")) {
+            RoundedButton addButton = new RoundedButton("Add Member", orange, white, "add.png");
+            addButton.addActionListener(e -> showAddMemberDialog());
+            buttonPanel.add(addButton);
+
+            RoundedButton updateButton = new RoundedButton("Update Member", orange, white, "update.png");
+            updateButton.addActionListener(e -> showUpdateMemberDialog());
+            buttonPanel.add(updateButton);
+
+            RoundedButton deleteButton = new RoundedButton("Delete Member", orange, white, "delete.png");
+            deleteButton.addActionListener(e -> deleteMember());
+            buttonPanel.add(deleteButton);
+        }
+        RoundedButton refreshButton = new RoundedButton("Refresh", blue, white, "refresh.png");
+        refreshButton.addActionListener(e -> refreshTable());
+        buttonPanel.add(refreshButton);
+
+        add(buttonPanel, BorderLayout.SOUTH);
+
+        // Load initial data
+        refreshTable();
+    }
+
+    private void searchMembers() {
+        String searchText = searchField.getText().trim().toLowerCase();
+        tableModel.setRowCount(0);
+        if (memberDAO != null) {
+            try {
+                List<Member> members = memberDAO.getAllMembers(user);
+                // Sort members by memberId before adding to the table
+                members.sort(Comparator.comparingInt(Member::getMemberId));
+                SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
+                for (Member member : members) {
+                    if (member.getName().toLowerCase().contains(searchText) ||
+                            member.getEmail().toLowerCase().contains(searchText) ||
+                            member.getPhone().toLowerCase().contains(searchText)) {
+                        tableModel.addRow(new Object[]{
+                                member.getMemberId(),
+                                member.getName(),
+                                member.getEmail(),
+                                member.getPhone(),
+                                dateFormat.format(member.getJoinDate()),
+                                member.getAddress()
+                        });
+                    }
+                }
+            } catch (SQLException | SecurityException e) {
+                JOptionPane.showMessageDialog(this, "Error loading members: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                e.printStackTrace();
+            }
+        } else {
+            JOptionPane.showMessageDialog(this, "MemberDAO is not initialized", "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void refreshTable() {
+        searchField.setText("");
+        searchMembers();
+    }
+
+    private void showAddMemberDialog() {
+        JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this), "Add Member", true);
+        dialog.setSize(500, 400);
+        dialog.setLocationRelativeTo(this);
+        dialog.setLayout(new GridBagLayout());
+        dialog.getContentPane().setBackground(white);
         GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(5, 5, 5, 5);
+        gbc.insets = new Insets(10, 10, 10, 10);
         gbc.fill = GridBagConstraints.HORIZONTAL;
 
-        // Labels and Fields
+        JTextField newNameField = new JTextField(20);
+        JTextField newEmailField = new JTextField(20);
+        JTextField newPhoneField = new JTextField(20);
+        JTextField newAddressField = new JTextField(20);
+        JTextField newUsernameField = new JTextField(20);
+        JPasswordField newPasswordField = new JPasswordField(20);
+
+        newNameField.setFont(new Font("Arial", Font.PLAIN, 16));
+        newEmailField.setFont(new Font("Arial", Font.PLAIN, 16));
+        newPhoneField.setFont(new Font("Arial", Font.PLAIN, 16));
+        newAddressField.setFont(new Font("Arial", Font.PLAIN, 16));
+        newUsernameField.setFont(new Font("Arial", Font.PLAIN, 16));
+        newPasswordField.setFont(new Font("Arial", Font.PLAIN, 16));
+
         gbc.gridx = 0;
         gbc.gridy = 0;
-        inputPanel.add(new JLabel("Name:"), gbc);
+        dialog.add(new JLabel("Name:"), gbc);
         gbc.gridx = 1;
-        nameField = new JTextField(20);
-        inputPanel.add(nameField, gbc);
+        dialog.add(newNameField, gbc);
 
         gbc.gridx = 0;
         gbc.gridy = 1;
-        inputPanel.add(new JLabel("Email:"), gbc);
+        dialog.add(new JLabel("Email:"), gbc);
         gbc.gridx = 1;
-        emailField = new JTextField(20);
-        inputPanel.add(emailField, gbc);
+        dialog.add(newEmailField, gbc);
 
         gbc.gridx = 0;
         gbc.gridy = 2;
-        inputPanel.add(new JLabel("Phone:"), gbc);
+        dialog.add(new JLabel("Phone:"), gbc);
         gbc.gridx = 1;
-        phoneField = new JTextField(20);
-        inputPanel.add(phoneField, gbc);
+        dialog.add(newPhoneField, gbc);
 
         gbc.gridx = 0;
         gbc.gridy = 3;
-        inputPanel.add(new JLabel("Address:"), gbc);
+        dialog.add(new JLabel("Address:"), gbc);
         gbc.gridx = 1;
-        addressField = new JTextField(20);
-        inputPanel.add(addressField, gbc);
+        dialog.add(newAddressField, gbc);
 
         gbc.gridx = 0;
         gbc.gridy = 4;
-        inputPanel.add(new JLabel("Username:"), gbc);
+        dialog.add(new JLabel("Username:"), gbc);
         gbc.gridx = 1;
-        usernameField = new JTextField(20);
-        inputPanel.add(usernameField, gbc);
+        dialog.add(newUsernameField, gbc);
 
         gbc.gridx = 0;
         gbc.gridy = 5;
-        inputPanel.add(new JLabel("Password:"), gbc);
+        dialog.add(new JLabel("Password:"), gbc);
         gbc.gridx = 1;
-        passwordField = new JPasswordField(20);
-        inputPanel.add(passwordField, gbc);
-
-        // Buttons
-        JPanel buttonPanel = new JPanel(new FlowLayout());
-        buttonPanel.setBackground(white);
-
-        RoundedButton addButton = new RoundedButton("Add Member", orange, white, null);
-        addButton.addActionListener(e -> addMember());
-        buttonPanel.add(addButton);
-
-        RoundedButton updateButton = new RoundedButton("Update Member", orange, white, null);
-        updateButton.addActionListener(e -> updateMember());
-        buttonPanel.add(updateButton);
-
-        RoundedButton deleteButton = new RoundedButton("Delete Member", orange, white, null);
-        deleteButton.addActionListener(e -> deleteMember());
-        buttonPanel.add(deleteButton);
+        dialog.add(newPasswordField, gbc);
 
         gbc.gridx = 0;
         gbc.gridy = 6;
         gbc.gridwidth = 2;
-        inputPanel.add(buttonPanel, gbc);
+        RoundedButton saveButton = new RoundedButton("Save", orange, white, "save.png");
+        saveButton.addActionListener(e -> {
+            String newName = newNameField.getText().trim();
+            String newEmail = newEmailField.getText().trim();
+            String newPhone = newPhoneField.getText().trim();
+            String newAddress = newAddressField.getText().trim();
+            String newUsername = newUsernameField.getText().trim();
+            String newPassword = new String(newPasswordField.getPassword()).trim();
 
-        add(inputPanel, BorderLayout.WEST);
-
-        // Table
-        String[] columns = {"ID", "Name", "Email", "Phone", "Address"};
-        tableModel = new DefaultTableModel(columns, 0);
-        membersTable = new JTable(tableModel);
-        membersTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        membersTable.getSelectionModel().addListSelectionListener(e -> {
-            int selectedRow = membersTable.getSelectedRow();
-            if (selectedRow >= 0) {
-                nameField.setText((String) tableModel.getValueAt(selectedRow, 1));
-                emailField.setText((String) tableModel.getValueAt(selectedRow, 2));
-                phoneField.setText((String) tableModel.getValueAt(selectedRow, 3));
-                addressField.setText((String) tableModel.getValueAt(selectedRow, 4));
-                usernameField.setText("");
-                passwordField.setText("");
-            }
-        });
-        JScrollPane scrollPane = new JScrollPane(membersTable);
-        add(scrollPane, BorderLayout.CENTER);
-
-        loadMembers();
-    }
-
-    private void loadMembers() {
-        try {
-            MemberDAO memberDAO = new MemberDAO();
-            List<Member> members = memberDAO.getAllMembers(user);
-            tableModel.setRowCount(0);
-            for (Member member : members) {
-                tableModel.addRow(new Object[]{
-                        member.getMemberId(),
-                        member.getName(),
-                        member.getEmail(),
-                        member.getPhone(),
-                        member.getAddress()
-                });
-            }
-        } catch (SQLException | SecurityException e) {
-            JOptionPane.showMessageDialog(this, "Error loading members: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
-        }
-    }
-
-    private void addMember() {
-        String name = nameField.getText().trim();
-        String email = emailField.getText().trim();
-        String phone = phoneField.getText().trim();
-        String address = addressField.getText().trim();
-        String username = usernameField.getText().trim();
-        String password = new String(passwordField.getPassword()).trim();
-
-        if (name.isEmpty() || email.isEmpty() || phone.isEmpty() || address.isEmpty() || username.isEmpty() || password.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "All fields are required", "Error", JOptionPane.ERROR_MESSAGE);
-            return;
-        }
-
-        if (!email.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
-            JOptionPane.showMessageDialog(this, "Invalid email format", "Error", JOptionPane.ERROR_MESSAGE);
-            return;
-        }
-
-        if (password.length() < 6) {
-            JOptionPane.showMessageDialog(this, "Password must be at least 6 characters", "Error", JOptionPane.ERROR_MESSAGE);
-            return;
-        }
-
-        try {
-            MemberDAO memberDAO = new MemberDAO();
-            if (isUsernameTaken(username)) {
-                JOptionPane.showMessageDialog(this, "Username already exists", "Error", JOptionPane.ERROR_MESSAGE);
+            if (newName.isEmpty() || newEmail.isEmpty() || newPhone.isEmpty() || newAddress.isEmpty() || newUsername.isEmpty() || newPassword.isEmpty()) {
+                JOptionPane.showMessageDialog(dialog, "All fields are required", "Error", JOptionPane.ERROR_MESSAGE);
                 return;
             }
-            memberDAO.addMember(user, name, email, phone, address, username, password);
-            JOptionPane.showMessageDialog(this, "Member added successfully", "Success", JOptionPane.INFORMATION_MESSAGE);
-            loadMembers();
-            clearFields();
-        } catch (SQLException | SecurityException e) {
-            JOptionPane.showMessageDialog(this, "Error adding member: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+
+            if (!newEmail.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
+                JOptionPane.showMessageDialog(dialog, "Invalid email format", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            if (newPassword.length() < 6) {
+                JOptionPane.showMessageDialog(dialog, "Password must be at least 6 characters", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            try {
+                if (memberDAO != null) {
+                    if (isUsernameTaken(newUsername)) {
+                        JOptionPane.showMessageDialog(dialog, "Username already exists", "Error", JOptionPane.ERROR_MESSAGE);
+                        return;
+                    }
+                    memberDAO.addMember(user, newName, newEmail, newPhone, newAddress, newUsername, newPassword);
+                    JOptionPane.showMessageDialog(dialog, "Member added successfully");
+                    dialog.dispose();
+                    refreshTable();
+                } else {
+                    JOptionPane.showMessageDialog(dialog, "MemberDAO is not initialized", "Error", JOptionPane.ERROR_MESSAGE);
+                }
+            } catch (SQLException | SecurityException ex) {
+                JOptionPane.showMessageDialog(dialog, "Error: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                ex.printStackTrace();
+            }
+        });
+        dialog.add(saveButton, gbc);
+
+        dialog.setVisible(true);
+    }
+
+    private void showUpdateMemberDialog() {
+        int selectedRow = membersTable.getSelectedRow();
+        if (selectedRow == -1) {
+            JOptionPane.showMessageDialog(this, "Select a member to update", "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        int memberId = (int) tableModel.getValueAt(selectedRow, 0);
+        String name = (String) tableModel.getValueAt(selectedRow, 1);
+        String email = (String) tableModel.getValueAt(selectedRow, 2);
+        String phone = (String) tableModel.getValueAt(selectedRow, 3);
+        String address = (String) tableModel.getValueAt(selectedRow, 5);
+
+        JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this), "Update Member", true);
+        dialog.setSize(500, 400);
+        dialog.setLocationRelativeTo(this);
+        dialog.setLayout(new GridBagLayout());
+        dialog.getContentPane().setBackground(white);
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(10, 10, 10, 10);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+
+        JTextField updatedNameField = new JTextField(name, 20);
+        JTextField updatedEmailField = new JTextField(email, 20);
+        JTextField updatedPhoneField = new JTextField(phone, 20);
+        JTextField updatedAddressField = new JTextField(address, 20);
+
+        updatedNameField.setFont(new Font("Arial", Font.PLAIN, 16));
+        updatedEmailField.setFont(new Font("Arial", Font.PLAIN, 16));
+        updatedPhoneField.setFont(new Font("Arial", Font.PLAIN, 16));
+        updatedAddressField.setFont(new Font("Arial", Font.PLAIN, 16));
+
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        dialog.add(new JLabel("Name:"), gbc);
+        gbc.gridx = 1;
+        dialog.add(updatedNameField, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 1;
+        dialog.add(new JLabel("Email:"), gbc);
+        gbc.gridx = 1;
+        dialog.add(updatedEmailField, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 2;
+        dialog.add(new JLabel("Phone:"), gbc);
+        gbc.gridx = 1;
+        dialog.add(updatedPhoneField, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 3;
+        dialog.add(new JLabel("Address:"), gbc);
+        gbc.gridx = 1;
+        dialog.add(updatedAddressField, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 4;
+        gbc.gridwidth = 2;
+        RoundedButton saveButton = new RoundedButton("Save", orange, white, "save.png");
+        saveButton.addActionListener(e -> {
+            String updatedName = updatedNameField.getText().trim();
+            String updatedEmail = updatedEmailField.getText().trim();
+            String updatedPhone = updatedPhoneField.getText().trim();
+            String updatedAddress = updatedAddressField.getText().trim();
+
+            if (updatedName.isEmpty() || updatedEmail.isEmpty() || updatedPhone.isEmpty() || updatedAddress.isEmpty()) {
+                JOptionPane.showMessageDialog(dialog, "All fields are required", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            if (!updatedEmail.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
+                JOptionPane.showMessageDialog(dialog, "Invalid email format", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            try {
+                if (memberDAO != null) {
+                    memberDAO.updateMember(user, memberId, updatedName, updatedEmail, updatedPhone, updatedAddress);
+                    JOptionPane.showMessageDialog(dialog, "Member updated successfully");
+                    dialog.dispose();
+                    refreshTable();
+                } else {
+                    JOptionPane.showMessageDialog(dialog, "MemberDAO is not initialized", "Error", JOptionPane.ERROR_MESSAGE);
+                }
+            } catch (SQLException | SecurityException ex) {
+                JOptionPane.showMessageDialog(dialog, "Error: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                ex.printStackTrace();
+            }
+        });
+        dialog.add(saveButton, gbc);
+
+        dialog.setVisible(true);
+    }
+
+    private void deleteMember() {
+        int selectedRow = membersTable.getSelectedRow();
+        if (selectedRow == -1) {
+            JOptionPane.showMessageDialog(this, "Select a member to delete", "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        int memberId = (int) tableModel.getValueAt(selectedRow, 0);
+        int confirm = JOptionPane.showConfirmDialog(this, "Delete member ID " + memberId + "?", "Confirm", JOptionPane.YES_NO_OPTION);
+        if (confirm == JOptionPane.YES_OPTION) {
+            try {
+                if (memberDAO != null) {
+                    memberDAO.deleteMember(user, memberId);
+                    JOptionPane.showMessageDialog(this, "Member deleted successfully");
+                    refreshTable();
+                } else {
+                    JOptionPane.showMessageDialog(this, "MemberDAO is not initialized", "Error", JOptionPane.ERROR_MESSAGE);
+                }
+            } catch (SQLException | SecurityException ex) {
+                JOptionPane.showMessageDialog(this, "Error: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                ex.printStackTrace();
+            }
         }
     }
 
@@ -206,71 +462,12 @@ public class MemberManagementPanel extends JPanel {
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(query)) {
             stmt.setString(1, username);
-            ResultSet rs = stmt.executeQuery();
-            if (rs.next()) {
-                return rs.getInt(1) > 0;
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1) > 0;
+                }
             }
         }
         return false;
-    }
-
-    private void updateMember() {
-        int selectedRow = membersTable.getSelectedRow();
-        if (selectedRow < 0) {
-            JOptionPane.showMessageDialog(this, "Select a member to update", "Error", JOptionPane.ERROR_MESSAGE);
-            return;
-        }
-
-        int memberId = (int) tableModel.getValueAt(selectedRow, 0);
-        String name = nameField.getText().trim();
-        String email = emailField.getText().trim();
-        String phone = phoneField.getText().trim();
-        String address = addressField.getText().trim();
-
-        if (name.isEmpty() || email.isEmpty() || phone.isEmpty() || address.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "All fields are required", "Error", JOptionPane.ERROR_MESSAGE);
-            return;
-        }
-
-        try {
-            MemberDAO memberDAO = new MemberDAO();
-            memberDAO.updateMember(user, memberId, name, email, phone, address);
-            JOptionPane.showMessageDialog(this, "Member updated successfully", "Success", JOptionPane.INFORMATION_MESSAGE);
-            loadMembers();
-            clearFields();
-        } catch (SQLException | SecurityException e) {
-            JOptionPane.showMessageDialog(this, "Error updating member: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
-        }
-    }
-
-    private void deleteMember() {
-        int selectedRow = membersTable.getSelectedRow();
-        if (selectedRow < 0) {
-            JOptionPane.showMessageDialog(this, "Select a member to delete", "Error", JOptionPane.ERROR_MESSAGE);
-            return;
-        }
-
-        int memberId = (int) tableModel.getValueAt(selectedRow, 0);
-        int confirm = JOptionPane.showConfirmDialog(this, "Are you sure you want to delete this member?", "Confirm Delete", JOptionPane.YES_NO_OPTION);
-        if (confirm == JOptionPane.YES_OPTION) {
-            try {
-                MemberDAO memberDAO = new MemberDAO();
-                memberDAO.deleteMember(user, memberId);
-                JOptionPane.showMessageDialog(this, "Member deleted successfully", "Success", JOptionPane.INFORMATION_MESSAGE);
-                loadMembers();
-                clearFields();
-            } catch (SQLException | SecurityException e) {
-                JOptionPane.showMessageDialog(this, "Error deleting member: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
-            }
-        }
-    }
-
-    private void clearFields() {
-        nameField.setText("");
-        emailField.setText("");
-        phoneField.setText("");
-        addressField.setText("");
-        usernameField.setText("");
-        passwordField.setText("");
     }
 }

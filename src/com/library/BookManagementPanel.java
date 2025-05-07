@@ -4,10 +4,12 @@ import javax.swing.*;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableColumnModel;
+import javax.swing.table.TableRowSorter;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.sql.SQLException;
+import java.util.Comparator;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -97,8 +99,10 @@ public class BookManagementPanel extends JPanel {
         bookTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         bookTable.setFont(new Font("Arial", Font.PLAIN, 16));
         bookTable.setRowHeight(30);
-        bookTable.setShowGrid(false);
-        bookTable.setIntercellSpacing(new Dimension(0, 0));
+        bookTable.setShowGrid(true); // Enable grid lines
+        bookTable.setGridColor(Color.LIGHT_GRAY); // Set grid color
+        bookTable.setBorder(BorderFactory.createLineBorder(Color.BLACK, 1)); // Add border around the table
+        bookTable.setIntercellSpacing(new Dimension(1, 1)); // Small spacing for better visibility
         bookTable.setBackground(white);
         bookTable.setSelectionBackground(new Color(230, 240, 255));
         bookTable.setSelectionForeground(Color.BLACK);
@@ -129,6 +133,12 @@ public class BookManagementPanel extends JPanel {
         columnModel.getColumn(5).setCellRenderer(centerRenderer); // Year
         columnModel.getColumn(6).setCellRenderer(centerRenderer); // Total Copies
         columnModel.getColumn(7).setCellRenderer(centerRenderer); // Available
+
+        // Sort by Book ID
+        TableRowSorter<DefaultTableModel> sorter = new TableRowSorter<>(tableModel);
+        bookTable.setRowSorter(sorter);
+        sorter.setSortKeys(List.of(new RowSorter.SortKey(0, SortOrder.ASCENDING))); // Default sort by ID
+        sorter.sort();
 
         // Simplified Hover Effect
         bookTable.addMouseListener(new MouseAdapter() {
@@ -178,6 +188,8 @@ public class BookManagementPanel extends JPanel {
         if (bookDAO != null) {
             try {
                 List<Book> books = bookDAO.getAllBooks(user);
+                // Sort books by bookId before adding to the table
+                books.sort(Comparator.comparingInt(Book::getBookId));
                 for (Book book : books) {
                     if (book.getTitle().toLowerCase().contains(searchText) ||
                             book.getIsbn().toLowerCase().contains(searchText)) {
