@@ -13,9 +13,13 @@ public class LoginFrame extends JFrame {
     private void initUI() {
         setTitle("Library Management System - Login");
         setDefaultCloseOperation(EXIT_ON_CLOSE);
-        setSize(600, 400);
+
+        // Set full-screen size
+        Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+        setSize(screenSize.width, screenSize.height);
+        setExtendedState(JFrame.MAXIMIZED_BOTH); // Maximize to full screen
         setLocationRelativeTo(null);
-        setResizable(false);
+        setResizable(true); // Allow resizing, as full-screen windows can still be resized
 
         // Gradient Background Panel
         JPanel backgroundPanel = new JPanel() {
