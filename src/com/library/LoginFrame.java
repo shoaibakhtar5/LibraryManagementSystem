@@ -4,7 +4,7 @@ import javax.swing.*;
 import java.awt.*;
 
 public class LoginFrame extends JFrame {
-    private LoginPanel loginPanel; // Instance field to hold the login panel
+    private LoginPanel loginPanel;
 
     public LoginFrame() {
         initUI();
@@ -14,38 +14,37 @@ public class LoginFrame extends JFrame {
         setTitle("Library Management System - Login");
         setDefaultCloseOperation(EXIT_ON_CLOSE);
 
-        // Set full-screen size
-        Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
-        setSize(screenSize.width, screenSize.height);
-        setExtendedState(JFrame.MAXIMIZED_BOTH); // Maximize to full screen
+        // Set size and center
+        setSize(1000, 700);
         setLocationRelativeTo(null);
-        setResizable(true); // Allow resizing, as full-screen windows can still be resized
+        setResizable(true);
 
-        // Gradient Background Panel
-        JPanel backgroundPanel = new JPanel() {
+        // Main panel with gradient background
+        JPanel mainPanel = new JPanel(new BorderLayout()) {
             @Override
             protected void paintComponent(Graphics g) {
                 super.paintComponent(g);
                 Graphics2D g2d = (Graphics2D) g;
-                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                GradientPaint gp = new GradientPaint(0, 0, new Color(0, 107, 204), 0, getHeight(), new Color(0, 62, 138));
+                GradientPaint gp = new GradientPaint(
+                        0, 0, new Color(20, 20, 20),
+                        getWidth(), getHeight(), new Color(50, 25, 0)
+                );
                 g2d.setPaint(gp);
                 g2d.fillRect(0, 0, getWidth(), getHeight());
             }
         };
-        backgroundPanel.setLayout(new BorderLayout());
-        add(backgroundPanel);
 
-        // Login Panel with callback to open DashboardFrame
+        // Login Panel
         loginPanel = new LoginPanel(this, () -> {
             User loggedInUser = loginPanel.getLoggedInUser();
             if (loggedInUser != null) {
-                dispose(); // Close LoginFrame
-                new DashboardFrame(loggedInUser).setVisible(true); // Open DashboardFrame with the logged-in user
+                dispose();
+                new DashboardFrame(loggedInUser).setVisible(true);
             }
         });
-        backgroundPanel.add(loginPanel, BorderLayout.CENTER);
 
+        mainPanel.add(loginPanel, BorderLayout.CENTER);
+        add(mainPanel);
         setVisible(true);
     }
 }

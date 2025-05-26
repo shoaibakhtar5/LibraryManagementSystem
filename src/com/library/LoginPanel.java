@@ -17,140 +17,179 @@ public class LoginPanel extends JPanel {
     public LoginPanel(JFrame parentFrame, Runnable onLoginSuccess) {
         this.parentFrame = parentFrame;
         this.onLoginSuccess = onLoginSuccess;
+        setOpaque(false);
         initUI();
     }
 
     private void initUI() {
         setLayout(new GridBagLayout());
-        setBackground(new Color(18, 18, 18)); // Black background
-
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(15, 15, 15, 15);
         gbc.fill = GridBagConstraints.HORIZONTAL;
 
-        JPanel cardPanel = new JPanel();
-        cardPanel.setBackground(new Color(30, 30, 30)); // Dark gray card
-        cardPanel.setLayout(new GridBagLayout());
-        cardPanel.setPreferredSize(new Dimension(450, 420));
-        cardPanel.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(255, 111, 0), 2), // Orange border
-                BorderFactory.createEmptyBorder(30, 30, 30, 30)
-        ));
+        // Main card panel
+        JPanel cardPanel = new JPanel(new GridBagLayout()) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                Graphics2D g2d = (Graphics2D) g;
+                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-        Font font = new Font("Segoe UI", Font.PLAIN, 16);
+                // Solid background with border
+                g2d.setColor(new Color(40, 40, 40, 230));
+                g2d.fillRoundRect(0, 0, getWidth(), getHeight(), 20, 20);
+
+                // Orange border
+                g2d.setColor(new Color(255, 120, 0));
+                g2d.setStroke(new BasicStroke(2f));
+                g2d.drawRoundRect(1, 1, getWidth()-2, getHeight()-2, 20, 20);
+            }
+        };
+        cardPanel.setPreferredSize(new Dimension(450, 500));
+        cardPanel.setOpaque(false);
+
+        // Form components
         Font labelFont = new Font("Segoe UI", Font.BOLD, 16);
+        Font fieldFont = new Font("Segoe UI", Font.PLAIN, 16);
 
-        // Logo or title
-        JLabel logoLabel = new JLabel("Library Login");
-        logoLabel.setFont(new Font("Segoe UI", Font.BOLD, 24));
-        logoLabel.setForeground(Color.WHITE);
-        logoLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        // Title
+        JLabel titleLabel = new JLabel("LIBRARY LOGIN");
+        titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 28));
+        titleLabel.setForeground(new Color(255, 160, 0));
+        titleLabel.setHorizontalAlignment(SwingConstants.CENTER); // 👈 Center the text
+
         gbc.gridx = 0;
         gbc.gridy = 0;
         gbc.gridwidth = 2;
-        cardPanel.add(logoLabel, gbc);
+        gbc.insets = new Insets(20, 0, 30, 0);
+        cardPanel.add(titleLabel, gbc);
 
-        // Username Label + Field
+// Reset insets
+        gbc.insets = new Insets(10, 20, 10, 20);
+
+        // Username field
         gbc.gridy = 1;
         gbc.gridwidth = 1;
-        gbc.gridx = 0;
-        JLabel usernameLabel = new JLabel("Username:");
-        usernameLabel.setFont(labelFont);
-        usernameLabel.setForeground(Color.WHITE);
-        cardPanel.add(usernameLabel, gbc);
+        addFormField(cardPanel, gbc, "Username:", usernameField = new JTextField(15), labelFont, fieldFont);
 
-        gbc.gridx = 1;
-        usernameField = new JTextField(15);
-        usernameField.setFont(font);
-        usernameField.setBackground(new Color(50, 50, 50));
-        usernameField.setForeground(Color.WHITE);
-        usernameField.setCaretColor(Color.WHITE);
-        usernameField.setBorder(BorderFactory.createLineBorder(Color.GRAY));
-        cardPanel.add(usernameField, gbc);
-
-        // Password Label + Field
+        // Password field
         gbc.gridy = 2;
-        gbc.gridx = 0;
-        JLabel passwordLabel = new JLabel("Password:");
-        passwordLabel.setFont(labelFont);
-        passwordLabel.setForeground(Color.WHITE);
-        cardPanel.add(passwordLabel, gbc);
+        addFormField(cardPanel, gbc, "Password:", passwordField = new JPasswordField(15), labelFont, fieldFont);
 
-        gbc.gridx = 1;
-        passwordField = new JPasswordField(15);
-        passwordField.setFont(font);
-        passwordField.setBackground(new Color(50, 50, 50));
-        passwordField.setForeground(Color.WHITE);
-        passwordField.setCaretColor(Color.WHITE);
-        passwordField.setEchoChar('•');
-        passwordField.setBorder(BorderFactory.createLineBorder(Color.GRAY));
-        cardPanel.add(passwordField, gbc);
-
-        // Role Label + ComboBox
+        // Role selection
+        // Role selection
         gbc.gridy = 3;
         gbc.gridx = 0;
+        gbc.gridwidth = 1;  // Make sure this is set to 1
+        gbc.anchor = GridBagConstraints.LINE_START;  // Align label to the left
         JLabel roleLabel = new JLabel("Role:");
         roleLabel.setFont(labelFont);
         roleLabel.setForeground(Color.WHITE);
         cardPanel.add(roleLabel, gbc);
 
         gbc.gridx = 1;
+        gbc.fill = GridBagConstraints.HORIZONTAL;  // Allow combo box to expand
+        gbc.weightx = 1.0;  // Give combo box more space
         String[] roles = {"Member", "Staff", "Admin"};
         roleComboBox = new JComboBox<>(roles);
-        roleComboBox.setFont(font);
-        roleComboBox.setBackground(new Color(50, 50, 50));
-        roleComboBox.setForeground(Color.WHITE);
-        roleComboBox.setBorder(BorderFactory.createLineBorder(Color.GRAY));
+        styleComboBox(roleComboBox);
+
+// 🔧 Minimal fix: set background to make arrow visible
+        roleComboBox.setBackground(new Color(50, 50, 50));  // Visible against dark backgrounds
+        roleComboBox.setForeground(Color.ORANGE);           // Optional: makes text match theme
+
         cardPanel.add(roleComboBox, gbc);
 
-        // Show Password Checkbox
+// Reset fill and weight for next components
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.weightx = 0.0;
+
+
+        // Show password checkbox
         gbc.gridy = 4;
         gbc.gridx = 1;
-        JCheckBox showPasswordCheckBox = new JCheckBox("Show Password");
-        showPasswordCheckBox.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        showPasswordCheckBox.setForeground(Color.ORANGE);
-        showPasswordCheckBox.setBackground(new Color(30, 30, 30));
-        showPasswordCheckBox.setFocusPainted(false);
-        showPasswordCheckBox.addActionListener(e -> {
-            if (showPasswordCheckBox.isSelected()) {
-                passwordField.setEchoChar((char) 0);
-            } else {
-                passwordField.setEchoChar('•');
-            }
+        JCheckBox showPassword = new JCheckBox("Show Password");
+        styleCheckBox(showPassword);
+        showPassword.addActionListener(e -> {
+            passwordField.setEchoChar(showPassword.isSelected() ? (char)0 : '•');
         });
-        cardPanel.add(showPasswordCheckBox, gbc);
+        cardPanel.add(showPassword, gbc);
 
-        // Login Button
+        // Login button
         gbc.gridy = 5;
         gbc.gridx = 0;
         gbc.gridwidth = 2;
-        JButton loginButton = new JButton("Login");
-        loginButton.setFont(new Font("Segoe UI", Font.BOLD, 18));
-        loginButton.setBackground(new Color(255, 111, 0));
-        loginButton.setForeground(Color.BLACK);
-        loginButton.setFocusPainted(false);
-        loginButton.setBorder(BorderFactory.createEmptyBorder(10, 15, 10, 15));
-        loginButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        gbc.insets = new Insets(30, 20, 20, 20);
+        JButton loginButton = new JButton("LOGIN");
+        styleButton(loginButton);
+        loginButton.addActionListener(e -> login());
+        cardPanel.add(loginButton, gbc);
 
-        loginButton.addMouseListener(new MouseAdapter() {
+        add(cardPanel);
+    }
+
+    private void addFormField(JPanel panel, GridBagConstraints gbc, String labelText, JComponent field, Font labelFont, Font fieldFont) {
+        gbc.gridx = 0;
+        JLabel label = new JLabel(labelText);
+        label.setFont(labelFont);
+        label.setForeground(Color.WHITE);
+        panel.add(label, gbc);
+
+        gbc.gridx = 1;
+        if (field instanceof JTextField) {
+            ((JTextField)field).setFont(fieldFont);
+            field.setBackground(new Color(60, 60, 60));
+            field.setForeground(Color.WHITE);
+            field.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLineBorder(new Color(80, 80, 80)),
+                    BorderFactory.createEmptyBorder(8, 10, 8, 10)
+            ));
+        }
+        panel.add(field, gbc);
+    }
+
+    private void styleComboBox(JComboBox<String> combo) {
+        combo.setFont(new Font("Segoe UI", Font.PLAIN, 16));
+        combo.setBackground(new Color(60, 60, 60));
+        combo.setForeground(Color.WHITE);
+        combo.setBorder(BorderFactory.createEmptyBorder(8, 10, 8, 10));
+        combo.setRenderer(new DefaultListCellRenderer() {
+            @Override
+            public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
+                super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+                setBackground(isSelected ? new Color(255, 120, 0) : new Color(60, 60, 60));
+                setForeground(isSelected ? Color.BLACK : Color.WHITE);
+                return this;
+            }
+        });
+    }
+
+    private void styleCheckBox(JCheckBox checkBox) {
+        checkBox.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        checkBox.setForeground(Color.WHITE);
+        checkBox.setOpaque(false);
+        checkBox.setFocusPainted(false);
+    }
+
+    private void styleButton(JButton button) {
+        button.setFont(new Font("Segoe UI", Font.BOLD, 18));
+        button.setBackground(new Color(255, 120, 0));
+        button.setForeground(Color.BLACK);
+        button.setBorder(BorderFactory.createEmptyBorder(10, 25, 10, 25));
+        button.setFocusPainted(false);
+        button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+
+        button.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseEntered(MouseEvent e) {
-                loginButton.setBackground(new Color(255, 143, 0));
+                button.setBackground(new Color(255, 140, 0));
             }
 
             @Override
             public void mouseExited(MouseEvent e) {
-                loginButton.setBackground(new Color(255, 111, 0));
+                button.setBackground(new Color(255, 120, 0));
             }
         });
-
-        loginButton.addActionListener(e -> login());
-        cardPanel.add(loginButton, gbc);
-
-        // Add to main panel
-        gbc.gridx = 0;
-        gbc.gridy = 0;
-        add(cardPanel, gbc);
     }
 
     private void login() {
@@ -168,10 +207,6 @@ public class LoginPanel extends JPanel {
             User user = userDAO.authenticate(username, password, role);
             if (user != null) {
                 loggedInUser = user;
-                parentFrame.getContentPane().removeAll();
-                parentFrame.add(new DashboardPanel());
-                parentFrame.revalidate();
-                parentFrame.repaint();
                 onLoginSuccess.run();
             } else {
                 JOptionPane.showMessageDialog(this, "Invalid credentials", "Error", JOptionPane.ERROR_MESSAGE);
